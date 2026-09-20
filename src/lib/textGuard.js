@@ -123,8 +123,34 @@ const KEYBOARD_ROWS = [
   'zxcvbnm',
 ]
 
-const INTERROGATIVES =
-  /\b(кто|кого|кому|кем|что|чего|чему|чем|какой|какая|какое|какие|каким|каких|где|куда|откуда|когда|почему|зачем|как|сколько|можно\s+ли|есть\s+ли|опишите|перечислите|расскажите|сформулируйте)\b/i
+const INTERROGATIVE_WORDS = [
+  'кто',
+  'кого',
+  'кому',
+  'кем',
+  'что',
+  'чего',
+  'чему',
+  'чем',
+  'какой',
+  'какая',
+  'какое',
+  'какие',
+  'каким',
+  'каких',
+  'где',
+  'куда',
+  'откуда',
+  'когда',
+  'почему',
+  'зачем',
+  'как',
+  'сколько',
+  'опишите',
+  'перечислите',
+  'расскажите',
+  'сформулируйте',
+]
 
 const CORE_LEXICON = [
   'роль',
@@ -177,6 +203,12 @@ const CORE_LEXICON = [
   'приём',
   'выдач',
   'возврат',
+  'функци',
+  'обязанн',
+  'задач',
+  'полномоч',
+  'тренир',
+  'занят',
 ]
 
 const VOWELS = /[аеёиоуыэюяaeiouy]/i
@@ -212,14 +244,16 @@ function ok() {
 
 function validateQuestion(text, scenario) {
   const words = wordList(text)
-  if (text.length < 12 || words.length < 3) return fail('tooShortQuestion')
+  if (text.length < 8 || words.length < 2) return fail('tooShortQuestion')
+  if (isSmalltalk(text)) return fail('offTopicQuestion')
 
-  const hasQuestionShape = INTERROGATIVES.test(text) || text.includes('?')
-  if (!hasQuestionShape) return fail('offTopicQuestion')
+  const domainHits = countLexiconHits(text, scenario)
+  if (domainHits >= 1) return ok()
 
-  const lexiconHits = countLexiconHits(text, scenario)
-  if (lexiconHits < 1 && !hasStrongQuestionShape(text)) return fail('offTopicQuestion')
-  return ok()
+  const analysisHits = countAnalysisHits(text)
+  const questionLike = hasInterrogative(text) || text.includes('?')
+  if (questionLike && (analysisHits >= 1 || words.length >= 3)) return ok()
+  return fail('offTopicQuestion')
 }
 
 function validateAnswer(text, scenario, prompt) {
@@ -242,10 +276,57 @@ function validateNote(text, scenario) {
   return ok()
 }
 
-function hasStrongQuestionShape(text) {
-  return /^(кто|что|как|какие|какой|зачем|почему|где|когда|сколько)\b.*\b(систем|процесс|роль|данн|правил|заказчик|пользовател)/i.test(
-    text,
-  )
+function hasInterrogative(text) {
+  const n = text.toLowerCase().replace(/ё/g, 'е')
+  if (/(^|[^а-яa-z])(можно|есть)\s+ли([^а-яa-z]|$)/i.test(n)) return true
+  const padded = ` ${n.replace(/[^а-яa-z0-9]+/gi, ' ')} `
+  return INTERROGATIVE_WORDS.some((w) => padded.includes(` ${w} `))
+}
+
+function isSmalltalk(text) {
+  const n = text
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[!?.,…]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return [
+    'привет',
+    'здравствуй',
+    'здравствуйте',
+    'как дела',
+    'как жизнь',
+    'что умеешь',
+    'кто ты',
+    'ты кто',
+    'как тебя зовут',
+    'какая погода',
+    'чем занимаешься',
+    'как настроение',
+  ].some((p) => n === p || n.startsWith(p + ' '))
+}
+
+const ANALYSIS_STEMS = [
+  'функци',
+  'обязанн',
+  'задач',
+  'полномоч',
+  'роль',
+  'процесс',
+  'систем',
+  'данн',
+  'правил',
+  'пользовател',
+  'сотрудник',
+  'заказчик',
+  'работ',
+  'делает',
+  'выполн',
+]
+
+function countAnalysisHits(text) {
+  const hay = text.toLowerCase().replace(/ё/g, 'е')
+  return ANALYSIS_STEMS.filter((stem) => hay.includes(stem)).length
 }
 
 function normalizeForProfanity(text) {
@@ -340,10 +421,15 @@ function isCopiedPrompt(answer, prompt) {
 
 function countLexiconHits(text, scenario) {
   const hay = text.toLowerCase().replace(/ё/g, 'е')
+  const words = wordList(text)
   const lexicon = collectLexicon(scenario)
   let hits = 0
   for (const stem of lexicon) {
-    if (stem.length >= 4 && hay.includes(stem)) hits += 1
+    if (stem.length < 4) continue
+    const hit =
+      hay.includes(stem) ||
+      words.some((w) => w.length >= 4 && (w.startsWith(stem) || stem.startsWith(w)))
+    if (hit) hits += 1
   }
   return hits
 }
