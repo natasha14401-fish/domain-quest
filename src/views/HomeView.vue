@@ -15,7 +15,6 @@ import { selectScenario } from '../state/session.js'
       <ul class="points">
         <li>Два режима: аналитик и стейкхолдер</li>
         <li>Несколько учебных сценариев</li>
-        <li>Работает офлайн, публикация через GitHub Pages</li>
       </ul>
     </div>
     <div class="hero-visual panel" aria-hidden="true">
