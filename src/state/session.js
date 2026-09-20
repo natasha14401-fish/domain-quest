@@ -1,6 +1,6 @@
 import { reactive, computed, watch } from 'vue'
 import { getScenario, topicOrder, topicMeta } from '../data/scenarios.js'
-import { validateStudentText } from '../lib/textGuard.js'
+import { validateStudentText, textContainsKey } from '../lib/textGuard.js'
 
 const STORAGE_KEY = 'domain-quest-session-v1'
 
@@ -133,7 +133,7 @@ export function matchStakeholderReply(question) {
 
   for (const topic of topicOrder) {
     for (const ans of s.topics[topic].answers) {
-      const hits = ans.keys.filter((k) => q.includes(k)).length
+      const hits = ans.keys.filter((k) => textContainsKey(q, k)).length
       if (hits > score) {
         score = hits
         best = ans

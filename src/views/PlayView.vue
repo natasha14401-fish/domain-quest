@@ -35,6 +35,28 @@ const currentInterview = computed(() => {
   return s.interview[session.interviewIndex] ?? null
 })
 
+const exampleActor = computed(() => {
+  const fact = scenario.value?.topics?.actors?.facts?.[0]?.text || ''
+  const head = fact.split(/[:.—–]/)[0].trim()
+  const word = head.split(/\s+/)[0]?.replace(/[^а-яёa-z-]/gi, '') || ''
+  return word || 'сотрудник'
+})
+
+const questionExamples = computed(() => {
+  const actor = exampleActor.value
+  const title = scenario.value?.title || 'этой системе'
+  return [
+    `Здравствуйте, какие роли есть?`,
+    `Что делает ${actor}?`,
+    `Как устроен основной процесс в «${title}»?`,
+    `Какие данные и правила нельзя нарушать?`,
+  ]
+})
+
+const questionPlaceholder = computed(
+  () => `Например: Здравствуйте, какие роли есть в «${scenario.value?.title || 'системе'}»?`,
+)
+
 function sendQuestion() {
   const result = askAsAnalyst(draft.value)
   if (!result.ok) {
@@ -82,7 +104,8 @@ function useHint(topic) {
         </h1>
         <p class="sub">
           <template v-if="track === 'analyst'">
-            {{ scenario.stakeholder.name }}, {{ scenario.stakeholder.role }}
+            {{ scenario.stakeholder.name }}, {{ scenario.stakeholder.role }}.
+            Спрашивайте про этот сценарий: роли, процессы, данные, правила, проблемы и цели.
           </template>
           <template v-else>
             Отвечайте по делу и своими словами: без отписок и ненормативной лексики. Ответы попадут в описание.
@@ -130,8 +153,20 @@ function useHint(topic) {
             </div>
           </div>
 
+          <div class="ask-help">
+            <p class="ask-help-title">Как задавать вопросы</p>
+            <p>
+              Пишите про <strong>{{ scenario.title }}</strong>: кто участвует, как идёт процесс,
+              какие данные, правила, проблемы и цели. Можно начать с «здравствуйте».
+              Не пишите «как дела» и не уходите от темы.
+            </p>
+            <ul>
+              <li v-for="ex in questionExamples" :key="ex">{{ ex }}</li>
+            </ul>
+          </div>
+
           <div class="suggest">
-            <span class="label">Подсказки по темам:</span>
+            <span class="label">Или возьмите готовую тему:</span>
             <button
               v-for="t in topicOrder"
               :key="t"
@@ -149,7 +184,7 @@ function useHint(topic) {
               class="field"
               :class="{ invalid: formError }"
               type="text"
-              placeholder="Например: Какие роли участвуют в выдаче книги?"
+              :placeholder="questionPlaceholder"
               maxlength="280"
               @input="clearError"
             />
@@ -322,6 +357,39 @@ h1 {
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--good);
+}
+
+.ask-help {
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 35%, var(--line));
+  background: color-mix(in srgb, var(--accent) 7%, white);
+}
+
+.ask-help-title {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ask-help p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.ask-help ul {
+  margin: 0.55rem 0 0;
+  padding: 0 0 0 1.1rem;
+  color: var(--ink);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.ask-help li + li {
+  margin-top: 0.15rem;
 }
 
 .suggest {

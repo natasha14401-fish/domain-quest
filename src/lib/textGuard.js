@@ -243,15 +243,18 @@ function ok() {
 }
 
 function validateQuestion(text, scenario) {
-  const words = wordList(text)
-  if (text.length < 8 || words.length < 2) return fail('tooShortQuestion')
-  if (isSmalltalk(text)) return fail('offTopicQuestion')
+  const content = stripLeadGreetings(text)
+  if (!content) return fail('offTopicQuestion')
 
-  const domainHits = countLexiconHits(text, scenario)
+  const words = wordList(content)
+  if (content.length < 8 || words.length < 2) return fail('tooShortQuestion')
+  if (isSmalltalk(content)) return fail('offTopicQuestion')
+
+  const domainHits = countLexiconHits(content, scenario)
   if (domainHits >= 1) return ok()
 
-  const analysisHits = countAnalysisHits(text)
-  const questionLike = hasInterrogative(text) || text.includes('?')
+  const analysisHits = countAnalysisHits(content)
+  const questionLike = hasInterrogative(content) || content.includes('?') || hasInterrogative(text)
   if (questionLike && (analysisHits >= 1 || words.length >= 3)) return ok()
   return fail('offTopicQuestion')
 }
@@ -284,16 +287,9 @@ function hasInterrogative(text) {
 }
 
 function isSmalltalk(text) {
-  const n = text
-    .toLowerCase()
-    .replace(/ё/g, 'е')
-    .replace(/[!?.,…]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  const n = stripLeadGreetings(text)
+  if (!n) return true
   return [
-    'привет',
-    'здравствуй',
-    'здравствуйте',
     'как дела',
     'как жизнь',
     'что умеешь',
@@ -304,6 +300,42 @@ function isSmalltalk(text) {
     'чем занимаешься',
     'как настроение',
   ].some((p) => n === p || n.startsWith(p + ' '))
+}
+
+const GREETINGS = [
+  'добрый день',
+  'добрый вечер',
+  'доброе утро',
+  'день добрый',
+  'здравствуйте',
+  'здравствуй',
+  'приветствую',
+  'привет',
+  'hello',
+  'hi',
+]
+
+function stripLeadGreetings(text) {
+  let n = String(text || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[!?.,…:;]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  let changed = true
+  while (changed && n) {
+    changed = false
+    for (const g of GREETINGS) {
+      if (n === g) return ''
+      if (n.startsWith(g + ' ')) {
+        n = n.slice(g.length).trim()
+        changed = true
+        break
+      }
+    }
+  }
+  return n
 }
 
 const ANALYSIS_STEMS = [
@@ -325,8 +357,9 @@ const ANALYSIS_STEMS = [
 ]
 
 function countAnalysisHits(text) {
-  const hay = text.toLowerCase().replace(/ё/g, 'е')
-  return ANALYSIS_STEMS.filter((stem) => hay.includes(stem)).length
+  const words = wordList(text)
+  return ANALYSIS_STEMS.filter((stem) => words.some((w) => stemsMatch(w, stem)) || textContainsKey(text, stem))
+    .length
 }
 
 function normalizeForProfanity(text) {
@@ -420,18 +453,86 @@ function isCopiedPrompt(answer, prompt) {
 }
 
 function countLexiconHits(text, scenario) {
-  const hay = text.toLowerCase().replace(/ё/g, 'е')
-  const words = wordList(text)
   const lexicon = collectLexicon(scenario)
   let hits = 0
   for (const stem of lexicon) {
-    if (stem.length < 4) continue
-    const hit =
-      hay.includes(stem) ||
-      words.some((w) => w.length >= 4 && (w.startsWith(stem) || stem.startsWith(w)))
-    if (hit) hits += 1
+    if (stem.length < 3) continue
+    if (textContainsKey(text, stem)) hits += 1
   }
   return hits
+}
+
+export function textContainsKey(text, key) {
+  const k = String(key || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .trim()
+  if (!k) return false
+  const hay = String(text || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+  if (hay.includes(k)) return true
+  const keyStem = stemWord(k)
+  if (keyStem.length >= 3 && hay.includes(keyStem)) return true
+  return wordList(text).some((w) => stemsMatch(w, k))
+}
+
+function stemsMatch(a, b) {
+  if (!a || !b) return false
+  if (a === b || a.startsWith(b) || b.startsWith(a)) return true
+  const sa = stemWord(a)
+  const sb = stemWord(b)
+  if (sa.length >= 3 && sb.length >= 3 && (sa === sb || sa.startsWith(sb) || sb.startsWith(sa))) return true
+  return false
+}
+
+function stemWord(word) {
+  let s = String(word || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+  const endings = [
+    'ами',
+    'ями',
+    'ого',
+    'ему',
+    'ыми',
+    'ими',
+    'ах',
+    'ях',
+    'ой',
+    'ей',
+    'ий',
+    'ый',
+    'ое',
+    'ие',
+    'ая',
+    'яя',
+    'ов',
+    'ев',
+    'ам',
+    'ям',
+    'ом',
+    'ем',
+    'ью',
+    'ия',
+    'ии',
+    'ию',
+    'ы',
+    'и',
+    'а',
+    'я',
+    'у',
+    'ю',
+    'е',
+    'о',
+    'ь',
+  ]
+  for (const ending of endings) {
+    if (s.length - ending.length >= 3 && s.endsWith(ending)) {
+      return s.slice(0, -ending.length)
+    }
+  }
+  return s
 }
 
 function collectLexicon(scenario) {
