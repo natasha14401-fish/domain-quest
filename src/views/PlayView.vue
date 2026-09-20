@@ -10,11 +10,12 @@ import {
   switchBothTrack,
   goToReport,
 } from '../state/session.js'
-import { topicOrder, topicMeta } from '../data/scenarios.js'
+import { topicOrder, topicMeta, scenarioNumber } from '../data/scenarios.js'
 import CoveragePanel from '../components/CoveragePanel.vue'
 
 const draft = ref('')
 const interviewDraft = ref('')
+const formError = ref('')
 const chatBox = ref(null)
 
 const track = computed(() => {
@@ -35,7 +36,12 @@ const currentInterview = computed(() => {
 })
 
 function sendQuestion() {
-  askAsAnalyst(draft.value)
+  const result = askAsAnalyst(draft.value)
+  if (!result.ok) {
+    formError.value = result.message
+    return
+  }
+  formError.value = ''
   draft.value = ''
   queueMicrotask(() => {
     if (chatBox.value) chatBox.value.scrollTop = chatBox.value.scrollHeight
@@ -43,8 +49,25 @@ function sendQuestion() {
 }
 
 function sendInterview() {
-  answerInterview(interviewDraft.value)
+  const result = answerInterview(interviewDraft.value)
+  if (!result.ok) {
+    formError.value = result.message
+    return
+  }
+  formError.value = ''
   interviewDraft.value = ''
+}
+
+function clearError() {
+  if (formError.value) formError.value = ''
+}
+
+function useHint(topic) {
+  formError.value = ''
+  askSuggested(topic)
+  queueMicrotask(() => {
+    if (chatBox.value) chatBox.value.scrollTop = chatBox.value.scrollHeight
+  })
 }
 </script>
 
@@ -52,9 +75,9 @@ function sendInterview() {
   <section v-if="scenario" class="play fade-up">
     <div class="top">
       <div>
-        <p class="eyebrow">{{ scenario.title }}</p>
+        <p class="eyebrow">Сценарий {{ String(scenarioNumber(scenario.id)).padStart(2, '0') }} · {{ scenario.title }}</p>
         <h1>
-          <template v-if="track === 'analyst'">Интервью со стейкхолдером</template>
+          <template v-if="track === 'analyst'">Интервью с заказчиком</template>
           <template v-else>Вы — эксперт предметной области</template>
         </h1>
         <p class="sub">
@@ -62,7 +85,7 @@ function sendInterview() {
             {{ scenario.stakeholder.name }}, {{ scenario.stakeholder.role }}
           </template>
           <template v-else>
-            Отвечайте по делу — ответы попадут в черновик описания.
+            Отвечайте по делу и своими словами: без отписок и ненормативной лексики. Ответы попадут в описание.
           </template>
         </p>
       </div>
@@ -72,7 +95,7 @@ function sendInterview() {
             class="tab"
             :class="{ active: session.bothTrack === 'analyst' }"
             type="button"
-            @click="switchBothTrack('analyst')"
+            @click="switchBothTrack('analyst'); clearError()"
           >
             Аналитик
           </button>
@@ -80,9 +103,9 @@ function sendInterview() {
             class="tab"
             :class="{ active: session.bothTrack === 'stakeholder' }"
             type="button"
-            @click="switchBothTrack('stakeholder')"
+            @click="switchBothTrack('stakeholder'); clearError()"
           >
-            Стейкхолдер
+            Заказчик
           </button>
         </div>
         <button class="btn" type="button" @click="goToReport">К описанию</button>
@@ -114,7 +137,7 @@ function sendInterview() {
               :key="t"
               class="chip"
               type="button"
-              @click="askSuggested(t)"
+              @click="useHint(t)"
             >
               {{ topicMeta[t].label }}
             </button>
@@ -124,11 +147,14 @@ function sendInterview() {
             <input
               v-model="draft"
               class="field"
+              :class="{ invalid: formError }"
               type="text"
               placeholder="Например: Какие роли участвуют в выдаче книги?"
               maxlength="280"
+              @input="clearError"
             />
             <button class="btn" type="submit" :disabled="!draft.trim()">Спросить</button>
+            <p v-if="formError" class="field-error">{{ formError }}</p>
           </form>
         </template>
 
@@ -142,8 +168,15 @@ function sendInterview() {
             <textarea
               v-model="interviewDraft"
               class="field"
+              :class="{ invalid: formError }"
               :placeholder="currentInterview.placeholder"
+              maxlength="1600"
+              @input="clearError"
             />
+            <p class="hint">
+              Минимум несколько предложений по сценарию: кто, как, какие данные и правила. Мат и отписки не засчитываются.
+            </p>
+            <p v-if="formError" class="field-error">{{ formError }}</p>
             <button class="btn" type="button" :disabled="!interviewDraft.trim()" @click="sendInterview">
               Ответить
             </button>
@@ -321,6 +354,17 @@ h1 {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 0.6rem;
+}
+
+.composer .field-error {
+  grid-column: 1 / -1;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .interview {

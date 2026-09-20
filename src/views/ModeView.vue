@@ -1,15 +1,16 @@
 <script setup>
 import { scenario, selectMode, session } from '../state/session.js'
+import { scenarioNumber } from '../data/scenarios.js'
 
 const modes = [
   {
     id: 'analyst',
     title: 'Я аналитик',
-    text: 'Задавайте вопросы стейкхолдеру, открывайте факты предметной области и заполняйте карту знаний.',
+    text: 'Задавайте вопросы заказчику, открывайте факты предметной области и заполняйте карту знаний.',
   },
   {
     id: 'stakeholder',
-    title: 'Я стейкхолдер',
+    title: 'Я заказчик',
     text: 'Система проводит структурированное интервью. Ваши ответы попадут в описание предметной области.',
   },
   {
@@ -28,7 +29,7 @@ function back() {
   <section v-if="scenario" class="wrap fade-up">
     <button class="btn ghost" type="button" @click="back">← к сценариям</button>
     <div class="head">
-      <p class="eyebrow">Сценарий</p>
+      <p class="eyebrow">Сценарий {{ String(scenarioNumber(scenario.id)).padStart(2, '0') }}</p>
       <h1>{{ scenario.title }}</h1>
       <p>{{ scenario.subtitle }}</p>
     </div>

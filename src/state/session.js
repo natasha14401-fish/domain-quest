@@ -1,5 +1,6 @@
 import { reactive, computed, watch } from 'vue'
 import { getScenario, topicOrder, topicMeta } from '../data/scenarios.js'
+import { validateStudentText } from '../lib/textGuard.js'
 
 const STORAGE_KEY = 'domain-quest-session-v1'
 
@@ -143,7 +144,7 @@ export function matchStakeholderReply(question) {
 
   if (!best || score === 0) {
     return {
-      text: 'Уточните вопрос: спросите про роли, процессы, данные, правила, проблемы или цели системы.',
+      text: 'Этот вопрос не про предметную область. Спросите про роли, процессы, данные, правила, проблемы или цели системы — своими словами и по делу.',
       gained: [],
       topic: null,
     }
@@ -162,8 +163,14 @@ export function askSuggested(topic) {
 }
 
 export function askAsAnalyst(question, forcedTopic = null) {
-  const text = question.trim()
-  if (!text) return
+  const text = String(question ?? '').trim()
+  if (!text) return { ok: false, message: 'Напишите вопрос своими словами.' }
+
+  if (!forcedTopic) {
+    const check = validateStudentText(text, { kind: 'question', scenario: scenario.value })
+    if (!check.ok) return check
+  }
+
   session.chat.push({ id: crypto.randomUUID(), from: 'analyst', text })
 
   let result
@@ -187,16 +194,23 @@ export function askAsAnalyst(question, forcedTopic = null) {
     topic: result.topic,
     gained: result.gained.map((g) => g.id),
   })
+  return { ok: true }
 }
 
 export function answerInterview(text) {
   const s = scenario.value
-  if (!s) return
+  if (!s) return { ok: false, message: 'Сначала выберите сценарий.' }
   const item = s.interview[session.interviewIndex]
-  if (!item) return
-  const answer = text.trim()
-  if (!answer) return
+  if (!item) return { ok: false, message: 'Интервью уже завершено.' }
 
+  const check = validateStudentText(text, {
+    kind: 'answer',
+    scenario: s,
+    prompt: item.question,
+  })
+  if (!check.ok) return check
+
+  const answer = text.trim()
   session.interviewAnswers[item.id] = answer
   if (!session.notes[item.topic]) {
     session.notes[item.topic] = answer
@@ -205,6 +219,11 @@ export function answerInterview(text) {
   }
   discoverTopicFacts(item.topic, 1)
   session.interviewIndex = Math.min(session.interviewIndex + 1, s.interview.length)
+  return { ok: true }
+}
+
+export function validateNote(topic, text) {
+  return validateStudentText(text, { kind: 'note', scenario: scenario.value })
 }
 
 export function switchBothTrack(track) {
@@ -269,7 +288,7 @@ export function buildDomainMarkdown() {
 
 function modeLabel(mode) {
   if (mode === 'analyst') return 'аналитик задаёт вопросы'
-  if (mode === 'stakeholder') return 'стейкхолдер отвечает системе'
+  if (mode === 'stakeholder') return 'заказчик отвечает системе'
   if (mode === 'both') return 'оба режима'
   return 'не выбран'
 }

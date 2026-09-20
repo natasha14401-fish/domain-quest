@@ -1,15 +1,18 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import {
   session,
   scenario,
   coverage,
   buildDomainMarkdown,
+  validateNote,
 } from '../state/session.js'
 import { topicOrder, topicMeta } from '../data/scenarios.js'
 
 const copied = ref(false)
 const preview = ref(buildDomainMarkdown())
+const noteErrors = reactive({})
+const lastGood = reactive({ ...session.notes })
 
 watch(
   () => [session.notes, session.discoveredIds, session.mode],
@@ -21,6 +24,31 @@ watch(
 
 function refreshPreview() {
   preview.value = buildDomainMarkdown()
+}
+
+function onNoteBlur(topic) {
+  const text = session.notes[topic] || ''
+  if (!text.trim()) {
+    noteErrors[topic] = ''
+    lastGood[topic] = ''
+    refreshPreview()
+    return
+  }
+  const check = validateNote(topic, text)
+  if (!check.ok) {
+    noteErrors[topic] = check.message
+    session.notes[topic] = lastGood[topic] || ''
+    refreshPreview()
+    return
+  }
+  noteErrors[topic] = ''
+  lastGood[topic] = text
+  refreshPreview()
+}
+
+function onNoteInput(topic) {
+  if (noteErrors[topic]) noteErrors[topic] = ''
+  refreshPreview()
 }
 
 async function copyMd() {
@@ -54,7 +82,7 @@ function backToPlay() {
         <h1>Описание предметной области</h1>
         <p class="sub">
           Открыто {{ coverage.found }} из {{ coverage.total }} учебных фактов.
-          Отредактируйте разделы и экспортируйте Markdown для отчёта и дальнейших диаграмм.
+          Отредактируйте разделы по существу: без отписок и ненормативной лексики. Затем экспортируйте Markdown для отчёта и диаграмм.
         </p>
       </div>
       <div class="actions">
@@ -74,9 +102,13 @@ function backToPlay() {
             :id="'note-' + t"
             v-model="session.notes[t]"
             class="field"
+            :class="{ invalid: noteErrors[t] }"
             rows="4"
-            @input="refreshPreview"
+            maxlength="1600"
+            @input="onNoteInput(t)"
+            @blur="onNoteBlur(t)"
           />
+          <p v-if="noteErrors[t]" class="field-error">{{ noteErrors[t] }}</p>
         </div>
       </div>
 

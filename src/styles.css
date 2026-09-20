@@ -53,7 +53,7 @@ a {
 }
 
 .app-shell {
-  width: min(1120px, calc(100% - 2rem));
+  width: min(1180px, calc(100% - 2rem));
   margin: 0 auto;
   padding: 1.25rem 0 3rem;
 }
@@ -146,9 +146,17 @@ a {
   outline: none;
 }
 
-.field:focus {
-  border-color: color-mix(in srgb, var(--accent) 55%, white);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+.field.invalid {
+  border-color: #b42318;
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.12);
+}
+
+.field-error {
+  margin: 0;
+  color: #9b1c1c;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 textarea.field {

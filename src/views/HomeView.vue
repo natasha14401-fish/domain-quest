@@ -1,6 +1,19 @@
 <script setup>
+import { computed, ref } from 'vue'
 import { scenarios } from '../data/scenarios.js'
 import { selectScenario } from '../state/session.js'
+
+const query = ref('')
+
+const listed = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  return scenarios
+    .map((s, i) => ({ s, n: i + 1 }))
+    .filter(({ s }) => {
+      if (!q) return true
+      return [s.title, s.subtitle, s.tone].join(' ').toLowerCase().includes(q)
+    })
+})
 </script>
 
 <template>
@@ -9,12 +22,12 @@ import { selectScenario } from '../state/session.js'
       <p class="eyebrow">Проектирование и дизайн ИС</p>
       <h1>Собери описание предметной области через интервью</h1>
       <p class="lead">
-        Задавай вопросы стейкхолдеру, отвечай системе как эксперт предметной области,
+        Задавай вопросы заказчику, отвечай системе как эксперт предметной области,
         собирай факты и экспортируй готовое описание для диаграмм и проектирования.
       </p>
       <ul class="points">
-        <li>Два режима: аналитик и стейкхолдер</li>
-        <li>Несколько учебных сценариев</li>
+        <li>Два режима: аналитик и заказчик</li>
+        <li>25 разных сценариев — по одному на студента в группе</li>
       </ul>
     </div>
     <div class="hero-visual panel" aria-hidden="true">
@@ -31,11 +44,15 @@ import { selectScenario } from '../state/session.js'
   <section class="scenarios fade-up">
     <div class="section-head">
       <h2>Выберите сценарий</h2>
-      <p>Каждый сценарий — отдельная предметная область для анализа.</p>
+      <p>В группе 25 человек — у каждого свой номер и своя предметная область.</p>
     </div>
+    <label class="search">
+      <span class="sr-only">Поиск сценария</span>
+      <input v-model="query" type="search" placeholder="Поиск по названию или теме…" />
+    </label>
     <div class="grid">
       <button
-        v-for="s in scenarios"
+        v-for="{ s, n } in listed"
         :key="s.id"
         class="card panel"
         type="button"
@@ -43,11 +60,13 @@ import { selectScenario } from '../state/session.js'
         @click="selectScenario(s.id)"
       >
         <span class="card-accent" />
+        <span class="card-num">Сценарий {{ String(n).padStart(2, '0') }}</span>
         <h3>{{ s.title }}</h3>
         <p>{{ s.subtitle }}</p>
         <small>{{ s.tone }}</small>
       </button>
     </div>
+    <p v-if="!listed.length" class="empty">Ничего не найдено — попробуйте другое слово.</p>
   </section>
 </template>
 
@@ -186,18 +205,66 @@ h1 {
   color: var(--muted);
 }
 
+.search {
+  display: block;
+  margin: 0 0 1rem;
+}
+
+.search input {
+  width: 100%;
+  max-width: 28rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  color: var(--ink);
+}
+
+.search input:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
 }
 
 .card {
   text-align: left;
-  padding: 1.2rem 1.2rem 1.1rem;
+  padding: 1.05rem 1.05rem 1rem;
   position: relative;
   overflow: hidden;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.card-num {
+  display: block;
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--card-accent, var(--accent));
+}
+
+.empty {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
 }
 
 .card:hover {
@@ -231,6 +298,12 @@ h1 {
   font-weight: 600;
 }
 
+@media (max-width: 960px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 860px) {
   .hero {
     grid-template-columns: 1fr;
@@ -243,7 +316,9 @@ h1 {
   h1 {
     max-width: none;
   }
+}
 
+@media (max-width: 640px) {
   .grid {
     grid-template-columns: 1fr;
   }
